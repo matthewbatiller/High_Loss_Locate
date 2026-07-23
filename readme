@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Line Distance Marker</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+<style>
+  :root{
+    --ink:#1c2430;
+    --paper:#f6f3ec;
+    --line:#2b6a4f;
+    --line-soft:#bcd8c8;
+    --accent:#b5561f;
+    --panel:#ffffff;
+    --border:#dcd6c6;
+    --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+    --serif: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{
+    font-family: var(--serif);
+    background: var(--paper);
+    color: var(--ink);
+    display:flex;
+    flex-direction:column;
+  }
+  header{
+    padding:14px 20px 10px;
+    border-bottom:1px solid var(--border);
+    display:flex;
+    align-items:baseline;
+    gap:14px;
+    flex-wrap:wrap;
+  }
+  header h1{
+    font-size:19px;
+    margin:0;
+    letter-spacing:0.02em;
+    font-weight:600;
+  }
+  header .sub{
+    font-family: var(--mono);
+    font-size:11px;
+    color:#6b6255;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+  }
+  #app{
+    flex:1;
+    display:flex;
+    min-height:0;
+  }
+  #sidebar{
+    width:320px;
+    min-width:320px;
+    background:var(--panel);
+    border-right:1px solid var(--border);
+    padding:16px;
+    overflow-y:auto;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  #map{
+    flex:1;
+    background:#e8e4d8;
+  }
+  .drop{
+    border:2px dashed #b8ac8f;
+    border-radius:6px;
+    padding:22px 12px;
+    text-align:center;
+    font-family: var(--mono);
+    font-size:12px;
+    color:#8a7f68;
+    cursor:pointer;
+    transition:border-color .15s, background .15s;
+  }
+  .drop.drag{
+    border-color:var(--line);
+    background:#f0f6f1;
+    color:var(--line);
+  }
+  .drop strong{
+    display:block;
+    font-family:var(--serif);
+    font-size:14px;
+    color:var(--ink);
+    margin-bottom:4px;
+    font-weight:600;
+  }
+  input[type=file]{display:none;}
+  .field label{
+    display:block;
+    font-family:var(--mono);
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    color:#8a7f68;
+    margin-bottom:5px;
+  }
+  select, input[type=number], input[type=text]{
+    width:100%;
+    padding:8px 9px;
+    border:1px solid var(--border);
+    border-radius:4px;
+    font-family:var(--mono);
+    font-size:13px;
+    background:#fdfcf9;
+    color:var(--ink);
+  }
+  select:focus, input[type=number]:focus{
+    outline:2px solid var(--line);
+    outline-offset:1px;
+  }
+  .row{display:flex; gap:8px;}
+  .row .field{flex:1;}
+  button{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:14px;
+    border:none;
+    border-radius:4px;
+    padding:10px 14px;
+    cursor:pointer;
+    transition:filter .15s;
+  }
+  button:hover{filter:brightness(0.95);}
+  button:disabled{opacity:0.45; cursor:not-allowed;}
+  #placeBtn{
+    background:var(--accent);
+    color:#fff;
+    width:100%;
+  }
+  #clearBtn{
+    background:transparent;
+    color:#8a7f68;
+    border:1px solid var(--border);
+    width:100%;
+    font-size:12px;
+    font-family:var(--mono);
+    text-transform:uppercase;
+    letter-spacing:.06em;
+    padding:8px;
+  }
+  #stats{
+    font-family:var(--mono);
+    font-size:12px;
+    color:#4a4438;
+    background:#f4f1e8;
+    border:1px solid var(--border);
+    border-radius:4px;
+    padding:10px 12px;
+    line-height:1.6;
+  }
+  #stats b{color:var(--ink);}
+  #markerList{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    max-height:260px;
+    overflow-y:auto;
+  }
+  .marker-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-family:var(--mono);
+    font-size:12px;
+    background:#fdfcf9;
+    border:1px solid var(--border);
+    border-radius:4px;
+    padding:6px 9px;
+  }
+  .marker-row button{
+    background:none;
+    border:none;
+    color:#a34b4b;
+    font-family:var(--mono);
+    font-size:11px;
+    padding:2px 6px;
+  }
+  .marker-row span.dist{color:var(--line); font-weight:700;}
+  .empty-note{
+    font-family:var(--mono);
+    font-size:11px;
+    color:#a89d84;
+    font-style:normal;
+  }
+  #status{
+    font-family:var(--mono);
+    font-size:11px;
+    min-height:14px;
+  }
+  #status.err{color:#a34b4b;}
+  #status.ok{color:var(--line);}
+  .leaflet-popup-content{font-family:var(--mono); font-size:12px;}
+  hr.divider{
+    border:none;
+    border-top:1px solid var(--border);
+    margin:0;
+  }
+  .checkbox-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-family:var(--mono);
+    font-size:12px;
+    color:#4a4438;
+    cursor:pointer;
+  }
+  .checkbox-row input{width:auto; margin:0;}
+  #startPointStatus{
+    font-family:var(--mono);
+    font-size:12px;
+    color:#4a4438;
+    background:#f4f1e8;
+    border:1px solid var(--border);
+    border-radius:4px;
+    padding:8px 9px;
+    margin-bottom:8px;
+    line-height:1.5;
+  }
+  .toggle-btn{
+    background:#eef2ee;
+    color:var(--line);
+    border:1px solid var(--line-soft);
+    font-size:12px;
+    font-family:var(--mono);
+    flex:1;
+  }
+  .toggle-btn.active{
+    background:var(--line);
+    color:#fff;
+    border-color:var(--line);
+  }
+  #resetStartBtn{
+    background:transparent;
+    color:#8a7f68;
+    border:1px solid var(--border);
+    font-size:12px;
+    font-family:var(--mono);
+    flex:1;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Line Distance Marker</h1>
+  <span class="sub">drop a route, dial in a distance, drop a pin</span>
+</header>
+
+<div id="app">
+  <div id="sidebar">
+
+    <div class="field">
+      <label for="basemapSelect">Basemap</label>
+      <select id="basemapSelect">
+        <option value="streets">Streets</option>
+        <option value="satellite">Satellite</option>
+        <option value="topo">Topographic</option>
+        <option value="light">Light (minimal)</option>
+        <option value="dark">Dark</option>
+      </select>
+    </div>
+
+    <div class="drop" id="dropZone">
+      <strong>Drop KMZ / KML here</strong>
+      or click to choose a file
+      <input type="file" id="fileInput" accept=".kmz,.kml" />
+    </div>
+
+    <div class="field" id="toleranceWrap" style="display:none;">
+      <label for="toleranceInput">Connection tolerance (meters)</label>
+      <div class="row">
+        <input type="number" id="toleranceInput" min="0" step="0.5" value="2" style="flex:1;" />
+        <button id="rebuildBtn" style="flex:1; font-size:12px;">Rebuild lines</button>
+      </div>
+    </div>
+
+    <div id="status"></div>
+
+    <div class="field" id="lineSelectWrap" style="display:none;">
+      <label for="lineSelect">Track / line</label>
+      <select id="lineSelect"></select>
+    </div>
+
+    <div class="field" id="unitWrap" style="display:none;">
+      <label for="unitSelect">Units</label>
+      <select id="unitSelect">
+        <option value="km">Kilometers</option>
+        <option value="mi">Miles</option>
+        <option value="m">Meters</option>
+        <option value="ft">Feet</option>
+      </select>
+    </div>
+
+    <div id="stats" style="display:none;"></div>
+
+    <hr class="divider" id="divider1" style="display:none;">
+
+    <div class="field" id="startPointWrap" style="display:none;">
+      <label>Start point</label>
+      <div id="startPointStatus">Using line start (0.00 km)</div>
+      <div class="row">
+        <button id="setStartBtn" class="toggle-btn">Click map to set</button>
+        <button id="resetStartBtn">Reset</button>
+      </div>
+      <button id="clickPlaceBtn" class="toggle-btn" style="width:100%; margin-top:8px;">Click line to place marker</button>
+    </div>
+
+    <label class="checkbox-row" id="directionWrap" style="display:none;">
+      <input type="checkbox" id="reverseDirCheckbox" />
+      Measure backward (toward line start)
+    </label>
+
+    <div class="row" id="distanceRow" style="display:none;">
+      <div class="field">
+        <label for="distInput">Distance from start point</label>
+        <input type="number" id="distInput" min="0" step="0.01" placeholder="e.g. 4.2" />
+      </div>
+    </div>
+
+    <div class="field" id="labelRow" style="display:none;">
+      <label for="labelInput">Label (optional)</label>
+      <input type="text" id="labelInput" placeholder="e.g. Splice vault 4" maxlength="80" />
+    </div>
+
+    <button id="placeBtn" style="display:none;" disabled>Place marker</button>
+    <button id="downloadBtn" style="display:none; background:#1c4f8a; color:#fff;">Download as KMZ</button>
+    <button id="clearBtn" style="display:none;">Clear all markers</button>
+
+    <hr class="divider" id="divider2" style="display:none;">
+
+    <div id="markerListWrap" style="display:none;">
+      <label style="font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:#8a7f68; display:block; margin-bottom:8px;">Placed markers</label>
+      <div id="markerList"></div>
+    </div>
+
+  </div>
+  <div id="map"></div>
+</div>
+
+<script>
+const map = L.map('map', {zoomControl:true}).setView([20,0], 2);
+
+const baseLayers = {
+  streets: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19
+  }),
+  satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS user community',
+    maxZoom: 19
+  }),
+  topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    attribution: 'Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)',
+    maxZoom: 17
+  }),
+  light: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+    maxZoom: 19
+  }),
+  dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+    maxZoom: 19
+  })
+};
+let currentBase = baseLayers.streets.addTo(map);
+
+const basemapSelect = document.getElementById('basemapSelect');
+basemapSelect.addEventListener('change', () => {
+  map.removeLayer(currentBase);
+  currentBase = baseLayers[basemapSelect.value].addTo(map);
+});
+
+let lineLayerGroup = L.layerGroup().addTo(map);
+let markerLayerGroup = L.layerGroup().addTo(map);
+let startMarkerLayer = L.layerGroup().addTo(map);
+
+let tracks = [];       // [{name, segments:[[[lon,lat],...], ...], lengthKm}]
+let activeTrack = null;
+let markerCount = 0;
+let placedMarkers = []; // [{id, km, label, lat, lon, marker}] — km is distance-from-custom-start, in kilometers
+let startOffsetKm = 0;   // distance (km) along the line where the custom start sits
+let direction = 1;       // 1 = measure toward line end, -1 = measure back toward line start
+let settingStart = false;
+let placingByClick = false;
+
+const UNITS = {
+  km: {factor: 1,          label: 'km'},
+  mi: {factor: 0.621371,   label: 'mi'},
+  m:  {factor: 1000,       label: 'm'},
+  ft: {factor: 3280.8399,  label: 'ft'}
+};
+let currentUnit = 'km';
+function formatDist(km){
+  const u = UNITS[currentUnit];
+  return `${(km * u.factor).toFixed(2)} ${u.label}`;
+}
+function displayToKm(value){
+  return value / UNITS[currentUnit].factor;
+}
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const toleranceWrap = document.getElementById('toleranceWrap');
+const toleranceInput = document.getElementById('toleranceInput');
+const rebuildBtn = document.getElementById('rebuildBtn');
+const statusEl = document.getElementById('status');
+let lastFound = null; // [{name, coords}] from the most recently parsed file
+const lineSelectWrap = document.getElementById('lineSelectWrap');
+const lineSelect = document.getElementById('lineSelect');
+const unitWrap = document.getElementById('unitWrap');
+const unitSelect = document.getElementById('unitSelect');
+const statsEl = document.getElementById('stats');
+const startPointWrap = document.getElementById('startPointWrap');
+const startPointStatus = document.getElementById('startPointStatus');
+const setStartBtn = document.getElementById('setStartBtn');
+const resetStartBtn = document.getElementById('resetStartBtn');
+const clickPlaceBtn = document.getElementById('clickPlaceBtn');
+const directionWrap = document.getElementById('directionWrap');
+const reverseDirCheckbox = document.getElementById('reverseDirCheckbox');
+const distanceRow = document.getElementById('distanceRow');
+const distInput = document.getElementById('distInput');
+const distInputLabel = document.querySelector('label[for="distInput"]');
+const labelRow = document.getElementById('labelRow');
+const labelInput = document.getElementById('labelInput');
+const placeBtn = document.getElementById('placeBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const clearBtn = document.getElementById('clearBtn');
+const markerListWrap = document.getElementById('markerListWrap');
+const markerList = document.getElementById('markerList');
+const divider1 = document.getElementById('divider1');
+const divider2 = document.getElementById('divider2');
+
+unitSelect.addEventListener('change', () => {
+  currentUnit = unitSelect.value;
+  distInputLabel.textContent = `Distance (${UNITS[currentUnit].label}) from start point`;
+  if (activeTrack) refreshStatsDisplay();
+  updateStartStatus();
+  refreshLineSelectLabels();
+  rebuildMarkerListUI();
+});
+
+function refreshStatsDisplay(){
+  if (!activeTrack) return;
+  const totalPoints = activeTrack.segments.reduce((sum,s) => sum + s.length, 0);
+  statsEl.innerHTML = `<b>Total length:</b> ${formatDist(activeTrack.lengthKm)}<br><b>Points in line:</b> ${totalPoints}` +
+    (activeTrack.segments.length > 1 ? `<br><b>Segments:</b> ${activeTrack.segments.length} (gaps are not connected)` : '');
+}
+
+function refreshLineSelectLabels(){
+  Array.from(lineSelect.options).forEach((opt, i) => {
+    opt.textContent = `${tracks[i].name} — ${formatDist(tracks[i].lengthKm)}`;
+  });
+}
+
+dropZone.addEventListener('click', () => fileInput.click());
+['dragenter','dragover'].forEach(ev => dropZone.addEventListener(ev, e => {
+  e.preventDefault(); dropZone.classList.add('drag');
+}));
+['dragleave','drop'].forEach(ev => dropZone.addEventListener(ev, e => {
+  e.preventDefault(); dropZone.classList.remove('drag');
+}));
+dropZone.addEventListener('drop', e => {
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
+});
+fileInput.addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (f) handleFile(f);
+});
+
+function setStatus(msg, kind){
+  statusEl.textContent = msg || '';
+  statusEl.className = kind || '';
+}
+
+async function handleFile(file){
+  setStatus('Reading ' + file.name + ' ...');
+  try {
+    let kmlText;
+    const lower = file.name.toLowerCase();
+    if (lower.endsWith('.kmz')) {
+      const buf = await file.arrayBuffer();
+      const zip = await JSZip.loadAsync(buf);
+      let kmlEntry = null;
+      zip.forEach((path, entry) => {
+        if (!kmlEntry && path.toLowerCase().endsWith('.kml')) kmlEntry = entry;
+      });
+      if (!kmlEntry) throw new Error('No .kml file found inside the KMZ archive.');
+      kmlText = await kmlEntry.async('text');
+    } else if (lower.endsWith('.kml')) {
+      kmlText = await file.text();
+    } else {
+      throw new Error('Please provide a .kmz or .kml file.');
+    }
+    parseKml(kmlText);
+  } catch (err) {
+    console.error(err);
+    setStatus(err.message || 'Could not read that file.', 'err');
+  }
+}
+
+function parseKml(kmlText){
+  const xml = new DOMParser().parseFromString(kmlText, 'text/xml');
+  if (xml.querySelector('parsererror')) {
+    setStatus('That KML/KMZ could not be parsed as XML.', 'err');
+    return;
+  }
+
+  const placemarks = Array.from(xml.getElementsByTagName('Placemark'));
+  const found = [];
+
+  function coordsFromEl(coordEl){
+    const raw = coordEl.textContent.trim();
+    const pts = raw.split(/\s+/).filter(Boolean).map(pair => {
+      const parts = pair.split(',').map(Number);
+      return [parts[0], parts[1]]; // [lon, lat]
+    }).filter(p => isFinite(p[0]) && isFinite(p[1]));
+    return pts;
+  }
+
+  // Walk placemarks, collect any LineString coordinate arrays (incl. inside MultiGeometry)
+  placemarks.forEach((pm, idx) => {
+    const nameEl = pm.getElementsByTagName('name')[0];
+    const name = nameEl ? nameEl.textContent.trim() : ('Track ' + (idx+1));
+
+    const lineStrings = Array.from(pm.getElementsByTagName('LineString'));
+    lineStrings.forEach((ls, j) => {
+      const coordEl = ls.getElementsByTagName('coordinates')[0];
+      if (!coordEl) return;
+      const pts = coordsFromEl(coordEl);
+      if (pts.length >= 2) {
+        found.push({
+          name: lineStrings.length > 1 ? `${name} (segment ${j+1})` : name,
+          coords: pts
+        });
+      }
+    });
+  });
+
+  // Fallback: any bare <LineString> not inside a Placemark we already caught
+  if (found.length === 0) {
+    const allLS = Array.from(xml.getElementsByTagName('LineString'));
+    allLS.forEach((ls, j) => {
+      const coordEl = ls.getElementsByTagName('coordinates')[0];
+      if (!coordEl) return;
+      const pts = coordsFromEl(coordEl);
+      if (pts.length >= 2) found.push({name: 'Line ' + (j+1), coords: pts});
+    });
+  }
+
+  if (found.length === 0) {
+    setStatus('No line (route/track) geometry found in that file — only points or polygons, or an unsupported structure.', 'err');
+    return;
+  }
+
+  lastFound = found;
+  toleranceWrap.style.display = 'block';
+  buildTracksFromFound(parseFloat(toleranceInput.value) || 2);
+}
+
+// --- Network-aware merging -------------------------------------------------
+// Some KML/KMZ files store one path as many separate LineStrings whose endpoints
+// don't land on exactly the same coordinate — often off by centimeters to a
+// couple meters due to how the source GIS data was exported/rounded. Matching
+// by exact coordinate string would treat those as unrelated dead ends. Instead,
+// match endpoints by real-world distance (haversine, in meters) within a
+// tolerance, and only merge when one candidate is clearly the match (not an
+// ambiguous three-way tie, which indicates a genuine junction/branch).
+function haversineMeters(a, b){
+  const R = 6371000;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(b[1] - a[1]);
+  const dLon = toRad(b[0] - a[0]);
+  const lat1 = toRad(a[1]), lat2 = toRad(b[1]);
+  const h = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function mergeIntoChains(rawSegments, toleranceM){
+  const segs = rawSegments.map(s => s.slice());
+  const used = new Array(segs.length).fill(false);
+
+  function candidatesNear(pt){
+    const out = [];
+    segs.forEach((seg, i) => {
+      if (used[i]) return;
+      const dStart = haversineMeters(pt, seg[0]);
+      const dEnd = haversineMeters(pt, seg[seg.length - 1]);
+      if (dStart <= toleranceM) out.push({segId: i, end: 'start', dist: dStart});
+      if (dEnd <= toleranceM) out.push({segId: i, end: 'end', dist: dEnd});
+    });
+    out.sort((a, b) => a.dist - b.dist);
+    return out;
+  }
+
+  // A match is "unambiguous" if there's only one candidate within tolerance,
+  // or the nearest is clearly closer than the next (so it isn't a real fork
+  // where multiple segments meet at essentially the same point).
+  function bestUnambiguous(cands){
+    if (cands.length === 0) return null;
+    if (cands.length === 1) return cands[0];
+    if (cands[1].dist > cands[0].dist * 3) return cands[0];
+    return null;
+  }
+
+  const chains = [];
+  for (let i = 0; i < segs.length; i++){
+    if (used[i]) continue;
+    used[i] = true;
+    let chain = segs[i].slice();
+    let progress = true;
+    while (progress){
+      progress = false;
+      const tailMatch = bestUnambiguous(candidatesNear(chain[chain.length - 1]));
+      if (tailMatch){
+        const seg = segs[tailMatch.segId];
+        const toAppend = tailMatch.end === 'start' ? seg.slice(1) : seg.slice(0, -1).reverse();
+        chain = chain.concat(toAppend);
+        used[tailMatch.segId] = true;
+        progress = true;
+        continue;
+      }
+      const headMatch = bestUnambiguous(candidatesNear(chain[0]));
+      if (headMatch){
+        const seg = segs[headMatch.segId];
+        const toPrepend = headMatch.end === 'end' ? seg.slice(0, -1) : seg.slice(1).reverse();
+        chain = toPrepend.concat(chain);
+        used[headMatch.segId] = true;
+        progress = true;
+      }
+    }
+    chains.push(chain);
+  }
+  return chains;
+}
+
+function buildTracksFromFound(toleranceM){
+  const found = lastFound;
+  if (!found) return;
+
+  const rawSegments = found.map(f => f.coords);
+  const chains = mergeIntoChains(rawSegments, toleranceM);
+  const networkDetected = chains.length !== found.length;
+
+  tracks = chains.map((coords, i) => {
+    const lengthKm = turf.length(turf.lineString(coords), {units:'kilometers'});
+    let name;
+    if (!networkDetected) {
+      // No merging happened — each chain is exactly one original line, keep its name.
+      name = found[i].name;
+    } else {
+      name = `Run ${i + 1}`;
+    }
+    return {name, segments: [coords], lengthKm};
+  });
+
+  // Longest runs first — usually the main trunk of a network is what people want by default.
+  tracks.sort((a, b) => b.lengthKm - a.lengthKm);
+
+  let options = tracks.map((t, i) => ({label: `${t.name} — ${formatDist(t.lengthKm)}`, idx: i}));
+
+  lineSelect.innerHTML = '';
+  options.forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o.idx;
+    opt.textContent = o.label;
+    lineSelect.appendChild(opt);
+  });
+  lineSelect.value = 0;
+
+  lineSelectWrap.style.display = tracks.length > 1 ? 'block' : 'none';
+  unitWrap.style.display = 'block';
+  drawActiveTrack();
+
+  markerLayerGroup.clearLayers();
+  markerCount = 0;
+  placedMarkers = [];
+  rebuildMarkerListUI();
+
+  divider1.style.display = 'block';
+  divider2.style.display = 'block';
+  distanceRow.style.display = 'flex';
+  labelRow.style.display = 'block';
+  placeBtn.style.display = 'block';
+  placeBtn.disabled = false;
+  clearBtn.style.display = 'block';
+  downloadBtn.style.display = 'block';
+  markerListWrap.style.display = 'block';
+
+  const pieceWord = found.length === 1 ? 'line' : 'line pieces';
+  const networkNote = networkDetected
+    ? ` Merged into ${tracks.length} continuous run${tracks.length>1?'s':''} (tolerance: ${toleranceM} m).`
+    : '';
+  setStatus(`Loaded ${found.length} ${pieceWord}.${networkNote}`, 'ok');
+}
+
+rebuildBtn.addEventListener('click', () => {
+  const tol = parseFloat(toleranceInput.value);
+  if (isNaN(tol) || tol < 0) {
+    setStatus('Enter a valid tolerance in meters.', 'err');
+    return;
+  }
+  buildTracksFromFound(tol);
+});
+
+lineSelect.addEventListener('change', drawActiveTrack);
+
+function drawActiveTrack(){
+  const idx = Number(lineSelect.value || 0);
+  activeTrack = tracks[idx];
+  lineLayerGroup.clearLayers();
+  markerLayerGroup.clearLayers();
+  startMarkerLayer.clearLayers();
+  markerCount = 0;
+  placedMarkers = [];
+  rebuildMarkerListUI();
+
+  // Reset the custom start point / direction whenever the selected line changes —
+  // an offset from the previous line wouldn't mean anything on a different one.
+  startOffsetKm = 0;
+  direction = 1;
+  reverseDirCheckbox.checked = false;
+  exitAllClickModes();
+  updateStartStatus();
+
+  // Draw each segment as its own polyline — Leaflet's multi-polyline form never
+  // connects separate arrays with a line, so gaps between segments stay gaps.
+  const segLatLngs = activeTrack.segments.map(seg => seg.map(c => [c[1], c[0]]));
+  const poly = L.polyline(segLatLngs, {color:'#2b6a4f', weight:3, opacity:0.9});
+  poly.addTo(lineLayerGroup);
+
+  const firstSeg = segLatLngs[0];
+  const lastSeg = segLatLngs[segLatLngs.length - 1];
+  L.circleMarker(firstSeg[0], {radius:5, color:'#2b6a4f', fillColor:'#2b6a4f', fillOpacity:1})
+    .bindTooltip('Start (0)', {permanent:false})
+    .addTo(lineLayerGroup);
+  L.circleMarker(lastSeg[lastSeg.length-1], {radius:5, color:'#b5561f', fillColor:'#b5561f', fillOpacity:1})
+    .bindTooltip(`End (${formatDist(activeTrack.lengthKm)})`, {permanent:false})
+    .addTo(lineLayerGroup);
+
+  // Mark segment boundaries when there's more than one, so gaps in the recording are visible.
+  if (segLatLngs.length > 1) {
+    for (let i = 0; i < segLatLngs.length - 1; i++) {
+      const endOfSeg = segLatLngs[i][segLatLngs[i].length - 1];
+      const startOfNext = segLatLngs[i+1][0];
+      L.circleMarker(endOfSeg, {radius:4, color:'#8a7f68', fillColor:'#fff', fillOpacity:1, weight:2})
+        .bindTooltip(`Segment ${i+1} end`, {permanent:false}).addTo(lineLayerGroup);
+      L.circleMarker(startOfNext, {radius:4, color:'#8a7f68', fillColor:'#fff', fillOpacity:1, weight:2})
+        .bindTooltip(`Segment ${i+2} start`, {permanent:false}).addTo(lineLayerGroup);
+    }
+  }
+
+  const boundsLayers = [poly];
+  map.fitBounds(L.featureGroup(boundsLayers).getBounds(), {padding:[30,30]});
+
+  statsEl.style.display = 'block';
+  refreshStatsDisplay();
+
+  startPointWrap.style.display = 'block';
+  directionWrap.style.display = 'flex';
+}
+
+function updateStartStatus(){
+  if (!activeTrack) return;
+  if (startOffsetKm === 0) {
+    startPointStatus.textContent = `Using line start (0 of ${formatDist(activeTrack.lengthKm)})`;
+  } else {
+    startPointStatus.textContent = `Custom start — ${formatDist(startOffsetKm)} along the line (of ${formatDist(activeTrack.lengthKm)} total)`;
+  }
+}
+
+function exitAllClickModes(){
+  settingStart = false;
+  setStartBtn.textContent = 'Click map to set';
+  setStartBtn.classList.remove('active');
+  placingByClick = false;
+  clickPlaceBtn.textContent = 'Click line to place marker';
+  clickPlaceBtn.classList.remove('active');
+  map.getContainer().style.cursor = '';
+}
+
+setStartBtn.addEventListener('click', () => {
+  if (!activeTrack) return;
+  const turningOn = !settingStart;
+  exitAllClickModes();
+  if (turningOn) {
+    settingStart = true;
+    setStartBtn.textContent = 'Click the line…';
+    setStartBtn.classList.add('active');
+    map.getContainer().style.cursor = 'crosshair';
+  }
+});
+
+clickPlaceBtn.addEventListener('click', () => {
+  if (!activeTrack) return;
+  const turningOn = !placingByClick;
+  exitAllClickModes();
+  if (turningOn) {
+    placingByClick = true;
+    clickPlaceBtn.textContent = 'Click the line…';
+    clickPlaceBtn.classList.add('active');
+    map.getContainer().style.cursor = 'crosshair';
+  }
+});
+
+resetStartBtn.addEventListener('click', () => {
+  startOffsetKm = 0;
+  startMarkerLayer.clearLayers();
+  updateStartStatus();
+  setStatus('');
+});
+
+reverseDirCheckbox.addEventListener('change', () => {
+  direction = reverseDirCheckbox.checked ? -1 : 1;
+});
+
+map.on('click', (e) => {
+  if (!activeTrack) return;
+  if (!settingStart && !placingByClick) return;
+
+  const clickPt = turf.point([e.latlng.lng, e.latlng.lat]);
+  const line = turf.lineString(activeTrack.segments[0]);
+  const snapped = turf.nearestPointOnLine(line, clickPt, {units:'kilometers'});
+  const loc = snapped.properties.location; // absolute km along the line from its true start
+
+  if (settingStart) {
+    const [lon, lat] = snapped.geometry.coordinates;
+    startOffsetKm = loc;
+    startMarkerLayer.clearLayers();
+    L.circleMarker([lat, lon], {radius:7, color:'#6b4fa0', fillColor:'#6b4fa0', fillOpacity:1, weight:2})
+      .bindTooltip(`Custom start — ${formatDist(loc)} along line`, {permanent:false})
+      .addTo(startMarkerLayer);
+    updateStartStatus();
+    exitAllClickModes();
+    setStatus(`Start point set at ${formatDist(loc)} along the line.`, 'ok');
+  } else if (placingByClick) {
+    placeMarkerAt(loc, labelInput.value.trim());
+  }
+});
+
+// Shared by both the typed-distance button and click-to-place: targetAbsoluteKm is the
+// distance along the *whole* line from its true start (0), regardless of any custom
+// start point or direction currently configured.
+function placeMarkerAt(targetAbsoluteKm, label){
+  if (!activeTrack) return;
+  const target = Math.max(0, Math.min(targetAbsoluteKm, activeTrack.lengthKm));
+  if (targetAbsoluteKm < 0) {
+    setStatus('That\'s before the line\'s start — placing marker at the start instead.', 'err');
+  } else if (targetAbsoluteKm > activeTrack.lengthKm) {
+    setStatus(`That's beyond the line's length (${formatDist(activeTrack.lengthKm)}). Placing marker at the end instead.`, 'err');
+  } else {
+    setStatus('');
+  }
+
+  const [lon, lat] = pointAtDistanceAlongSegments(activeTrack.segments, target);
+  const kmFromStart = (target - startOffsetKm) * direction;
+
+  markerCount++;
+  const marker = L.marker([lat, lon]);
+  marker.addTo(markerLayerGroup);
+  marker.openPopup();
+  map.panTo([lat, lon]);
+
+  const record = {id: markerCount, km: kmFromStart, label: label || '', lat, lon, marker};
+  placedMarkers.push(record);
+  updateMarkerPopup(record);
+  rebuildMarkerListUI();
+  labelInput.value = '';
+}
+
+function updateMarkerPopup(record){
+  const title = record.label ? escapeHtml(record.label) : formatDist(record.km);
+  const subtitle = record.label ? `${formatDist(record.km)} from start point<br>` : '';
+  record.marker.bindPopup(`<b>${title}</b><br>${subtitle}${record.lat.toFixed(5)}, ${record.lon.toFixed(5)}`);
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// Walks segments in order, treating gaps between them as "free" (not counted as distance),
+// so the requested km only ever measures distance actually travelled along real line points.
+function pointAtDistanceAlongSegments(segments, km){
+  let remaining = km;
+  for (let i = 0; i < segments.length; i++){
+    const seg = segments[i];
+    const line = turf.lineString(seg);
+    const segLen = turf.length(line, {units:'kilometers'});
+    const isLast = i === segments.length - 1;
+    if (remaining <= segLen || isLast) {
+      const pt = turf.along(line, Math.min(remaining, segLen), {units:'kilometers'});
+      return pt.geometry.coordinates; // [lon, lat]
+    }
+    remaining -= segLen;
+  }
+  // Fallback (shouldn't reach here): last point of last segment
+  const lastSeg = segments[segments.length - 1];
+  return lastSeg[lastSeg.length - 1];
+}
+
+placeBtn.addEventListener('click', () => {
+  if (!activeTrack) return;
+  const enteredVal = parseFloat(distInput.value);
+  if (isNaN(enteredVal) || enteredVal < 0) {
+    setStatus(`Enter a valid distance in ${UNITS[currentUnit].label}.`, 'err');
+    return;
+  }
+  const enteredKm = displayToKm(enteredVal);
+  const rawTarget = startOffsetKm + direction * enteredKm;
+  placeMarkerAt(rawTarget, labelInput.value.trim());
+});
+
+distInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') placeBtn.click();
+});
+
+function rebuildMarkerListUI(){
+  markerList.innerHTML = '';
+  if (placedMarkers.length === 0) {
+    const note = document.createElement('div');
+    note.className = 'empty-note';
+    note.textContent = 'No markers placed yet.';
+    markerList.appendChild(note);
+    return;
+  }
+  const sorted = placedMarkers.slice().sort((a,b) => a.km - b.km);
+  sorted.forEach(record => {
+    const row = document.createElement('div');
+    row.className = 'marker-row';
+    const title = record.label ? escapeHtml(record.label) : formatDist(record.km);
+    const sub = record.label ? ` (${formatDist(record.km)})` : '';
+    row.innerHTML = `<span><span class="dist">${title}</span>${sub} — ${record.lat.toFixed(4)}, ${record.lon.toFixed(4)}</span>`;
+    const del = document.createElement('button');
+    del.textContent = '✕';
+    del.title = 'Remove marker';
+    del.addEventListener('click', () => {
+      markerLayerGroup.removeLayer(record.marker);
+      placedMarkers = placedMarkers.filter(m => m.id !== record.id);
+      rebuildMarkerListUI();
+    });
+    row.appendChild(del);
+    markerList.appendChild(row);
+  });
+}
+rebuildMarkerListUI();
+
+clearBtn.addEventListener('click', () => {
+  markerLayerGroup.clearLayers();
+  markerCount = 0;
+  placedMarkers = [];
+  rebuildMarkerListUI();
+  setStatus('');
+});
+
+function escapeXml(str){
+  return String(str).replace(/[<>&'"]/g, c => ({
+    '<':'&lt;', '>':'&gt;', '&':'&amp;', "'":'&apos;', '"':'&quot;'
+  }[c]));
+}
+
+function buildKmlDocument(){
+  const lineCoordsText = activeTrack.segments[0]
+    .map(c => `${c[0]},${c[1]},0`)
+    .join(' ');
+
+  const linePlacemark = `
+    <Placemark>
+      <name>${escapeXml(activeTrack.name)}</name>
+      <Style><LineStyle><color>ff4f6a2b</color><width>3</width></LineStyle></Style>
+      <LineString>
+        <tessellate>1</tessellate>
+        <coordinates>${lineCoordsText}</coordinates>
+      </LineString>
+    </Placemark>`;
+
+  const sortedMarkers = placedMarkers.slice().sort((a,b) => a.km - b.km);
+  const markerPlacemarks = sortedMarkers.map(m => {
+    const name = m.label ? m.label : formatDist(m.km);
+    const description = `${formatDist(m.km)} from start point along "${activeTrack.name}"`;
+    return `
+    <Placemark>
+      <name>${escapeXml(name)}</name>
+      <description>${escapeXml(description)}</description>
+      <Point>
+        <coordinates>${m.lon},${m.lat},0</coordinates>
+      </Point>
+    </Placemark>`;
+  }).join('');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>${escapeXml(activeTrack.name)} — distance markers</name>
+${linePlacemark}
+${markerPlacemarks}
+  </Document>
+</kml>`;
+}
+
+downloadBtn.addEventListener('click', async () => {
+  if (!activeTrack) return;
+  const originalText = downloadBtn.textContent;
+  downloadBtn.textContent = 'Building…';
+  downloadBtn.disabled = true;
+
+  try {
+    const kmlString = buildKmlDocument();
+    const zip = new JSZip();
+    zip.file('doc.kml', kmlString);
+    const blob = await zip.generateAsync({type:'blob'});
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${activeTrack.name.replace(/[^a-z0-9]+/gi, '_')}_markers.kmz`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+    const count = placedMarkers.length;
+    setStatus(`Downloaded KMZ with the line and ${count} marker${count===1?'':'s'}.`, 'ok');
+  } catch (err) {
+    console.error(err);
+    setStatus('Could not build the KMZ file.', 'err');
+  }
+  downloadBtn.textContent = originalText;
+  downloadBtn.disabled = false;
+});
+
+</script>
+</body>
+</html>
