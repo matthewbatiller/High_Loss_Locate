@@ -10,45 +10,88 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
 <style>
   :root{
-    --ink:#1c2430;
-    --paper:#f6f3ec;
-    --line:#2b6a4f;
-    --line-soft:#bcd8c8;
-    --accent:#b5561f;
-    --panel:#ffffff;
-    --border:#dcd6c6;
-    --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
-    --serif: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --bg:#0a0e1a;
+    --panel:#0d1420;
+    --panel-alt:#111a2e;
+    --border:#1e293f;
+    --text:#e6ebf5;
+    --text-muted:#7b8aa8;
+    --accent:#38bdf8;
+    --accent-strong:#22d3ee;
+    --line:#4ade80;
+    --line-soft:#1f4d3a;
+    --endpoint:#f59e0b;
+    --start-marker:#a78bfa;
+    --warn-border:#d99a3d;
+    --warn-bg:rgba(217,154,61,0.08);
+    --warn-text:#e8b878;
+    --danger:#f0625d;
+    --mono: "SFMono-Regular", "IBM Plex Mono", Consolas, "Roboto Mono", monospace;
   }
   *{box-sizing:border-box;}
   html,body{height:100%;margin:0;}
   body{
-    font-family: var(--serif);
-    background: var(--paper);
-    color: var(--ink);
+    font-family: var(--mono);
+    background: var(--bg);
+    color: var(--text);
     display:flex;
     flex-direction:column;
   }
   header{
-    padding:14px 20px 10px;
+    padding:12px 20px;
+    background: var(--panel);
     border-bottom:1px solid var(--border);
     display:flex;
-    align-items:baseline;
+    align-items:center;
+    justify-content:space-between;
     gap:14px;
     flex-wrap:wrap;
   }
+  header .brand{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+  }
+  header .dot{
+    display:inline-block;
+    width:8px; height:8px;
+    border-radius:50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    margin-right:4px;
+  }
   header h1{
-    font-size:19px;
+    font-size:14px;
     margin:0;
-    letter-spacing:0.02em;
-    font-weight:600;
+    letter-spacing:0.06em;
+    font-weight:700;
+    text-transform:uppercase;
+    color:var(--text);
   }
   header .sub{
-    font-family: var(--mono);
     font-size:11px;
-    color:#6b6255;
+    color: var(--text-muted);
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+  }
+  header .stats{
+    display:flex;
+    gap:22px;
+  }
+  header .stat{
+    font-size:10px;
     text-transform:uppercase;
     letter-spacing:0.08em;
+    color: var(--text-muted);
+    display:flex;
+    align-items:baseline;
+    gap:6px;
+  }
+  header .stat b{
+    font-size:13px;
+    color: var(--accent);
+    font-weight:700;
+    letter-spacing:0;
   }
   #app{
     flex:1;
@@ -58,107 +101,145 @@
   #sidebar{
     width:320px;
     min-width:320px;
-    background:var(--panel);
+    background: var(--panel);
     border-right:1px solid var(--border);
-    padding:16px;
+    display:flex;
+    flex-direction:column;
+    min-height:0;
+  }
+  #sidebarScroll{
+    flex:1;
+    min-height:0;
     overflow-y:auto;
+    padding:16px;
     display:flex;
     flex-direction:column;
     gap:16px;
   }
+  #sidebarFooter{
+    display:none;
+    gap:8px;
+    padding:12px 16px;
+    border-top:1px solid var(--border);
+    background: var(--panel);
+  }
+  #sidebarFooter button{ flex:1; }
   #map{
     flex:1;
-    background:#e8e4d8;
+    background:#151b2b;
   }
   .drop{
-    border:2px dashed #b8ac8f;
-    border-radius:6px;
-    padding:22px 12px;
+    border:1px dashed #2b3a56;
+    border-radius:8px;
+    padding:24px 14px;
     text-align:center;
-    font-family: var(--mono);
     font-size:12px;
-    color:#8a7f68;
+    color: var(--text-muted);
     cursor:pointer;
+    background: var(--panel-alt);
     transition:border-color .15s, background .15s;
   }
+  .drop .drop-icon{
+    color: var(--accent);
+    font-size:20px;
+    display:block;
+    margin-bottom:8px;
+  }
   .drop.drag{
-    border-color:var(--line);
-    background:#f0f6f1;
-    color:var(--line);
+    border-color: var(--accent);
+    background:#0f2436;
+    color: var(--accent);
   }
   .drop strong{
     display:block;
-    font-family:var(--serif);
-    font-size:14px;
-    color:var(--ink);
+    font-size:13px;
+    color: var(--text);
     margin-bottom:4px;
-    font-weight:600;
+    font-weight:700;
   }
   input[type=file]{display:none;}
+  .info-box{
+    font-size:11px;
+    line-height:1.6;
+    color: var(--warn-text);
+    background: var(--warn-bg);
+    border:1px solid var(--warn-border);
+    border-radius:6px;
+    padding:10px 12px;
+  }
+  .section-label{
+    font-size:10px;
+    text-transform:uppercase;
+    letter-spacing:0.1em;
+    color: var(--text-muted);
+    margin-bottom:2px;
+  }
   .field label{
     display:block;
-    font-family:var(--mono);
     font-size:10px;
     text-transform:uppercase;
     letter-spacing:0.08em;
-    color:#8a7f68;
+    color: var(--text-muted);
     margin-bottom:5px;
   }
   select, input[type=number], input[type=text]{
     width:100%;
     padding:8px 9px;
     border:1px solid var(--border);
-    border-radius:4px;
+    border-radius:5px;
     font-family:var(--mono);
-    font-size:13px;
-    background:#fdfcf9;
-    color:var(--ink);
+    font-size:12px;
+    background: var(--panel-alt);
+    color: var(--text);
   }
-  select:focus, input[type=number]:focus{
-    outline:2px solid var(--line);
+  select:focus, input[type=number]:focus, input[type=text]:focus{
+    outline:1px solid var(--accent);
     outline-offset:1px;
+    border-color: var(--accent);
   }
   .row{display:flex; gap:8px;}
   .row .field{flex:1;}
   button{
-    font-family:var(--serif);
+    font-family:var(--mono);
     font-weight:600;
-    font-size:14px;
-    border:none;
-    border-radius:4px;
-    padding:10px 14px;
+    font-size:12px;
+    border:1px solid var(--border);
+    border-radius:5px;
+    padding:9px 12px;
     cursor:pointer;
-    transition:filter .15s;
+    background: var(--panel-alt);
+    color: var(--text);
+    transition:filter .15s, border-color .15s;
   }
-  button:hover{filter:brightness(0.95);}
-  button:disabled{opacity:0.45; cursor:not-allowed;}
+  button:hover{filter:brightness(1.2);}
+  button:disabled{opacity:0.4; cursor:not-allowed;}
   #placeBtn{
-    background:var(--accent);
-    color:#fff;
+    background: var(--accent);
+    border-color: var(--accent);
+    color:#04202b;
     width:100%;
+  }
+  #downloadBtn{
+    width:100%;
+    border-color: var(--accent);
+    color: var(--accent);
   }
   #clearBtn{
-    background:transparent;
-    color:#8a7f68;
-    border:1px solid var(--border);
     width:100%;
-    font-size:12px;
-    font-family:var(--mono);
     text-transform:uppercase;
     letter-spacing:.06em;
-    padding:8px;
+    font-size:11px;
   }
   #stats{
-    font-family:var(--mono);
     font-size:12px;
-    color:#4a4438;
-    background:#f4f1e8;
+    color: var(--text-muted);
+    background: var(--panel-alt);
     border:1px solid var(--border);
-    border-radius:4px;
+    border-radius:6px;
     padding:10px 12px;
     line-height:1.6;
   }
-  #stats b{color:var(--ink);}
+  #stats b{color: var(--text);}
   #markerList{
     display:flex;
     flex-direction:column;
@@ -170,36 +251,40 @@
     display:flex;
     justify-content:space-between;
     align-items:center;
-    font-family:var(--mono);
     font-size:12px;
-    background:#fdfcf9;
+    background: var(--panel-alt);
     border:1px solid var(--border);
-    border-radius:4px;
+    border-radius:5px;
     padding:6px 9px;
   }
   .marker-row button{
     background:none;
     border:none;
-    color:#a34b4b;
-    font-family:var(--mono);
+    color: var(--danger);
     font-size:11px;
     padding:2px 6px;
   }
-  .marker-row span.dist{color:var(--line); font-weight:700;}
+  .marker-row span.dist{color: var(--line); font-weight:700;}
   .empty-note{
-    font-family:var(--mono);
     font-size:11px;
-    color:#a89d84;
+    color: var(--text-muted);
     font-style:normal;
   }
   #status{
-    font-family:var(--mono);
     font-size:11px;
     min-height:14px;
   }
-  #status.err{color:#a34b4b;}
-  #status.ok{color:var(--line);}
+  #status.err{color: var(--danger);}
+  #status.ok{color: var(--line);}
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip{
+    background: var(--panel-alt);
+    color: var(--text);
+  }
   .leaflet-popup-content{font-family:var(--mono); font-size:12px;}
+  .leaflet-div-icon.arrow-marker-icon{
+    background:transparent;
+    border:none;
+  }
   hr.divider{
     border:none;
     border-top:1px solid var(--border);
@@ -209,42 +294,38 @@
     display:flex;
     align-items:center;
     gap:8px;
-    font-family:var(--mono);
     font-size:12px;
-    color:#4a4438;
+    color: var(--text-muted);
     cursor:pointer;
   }
   .checkbox-row input{width:auto; margin:0;}
   #startPointStatus{
-    font-family:var(--mono);
     font-size:12px;
-    color:#4a4438;
-    background:#f4f1e8;
+    color: var(--text-muted);
+    background: var(--panel-alt);
     border:1px solid var(--border);
-    border-radius:4px;
+    border-radius:6px;
     padding:8px 9px;
     margin-bottom:8px;
     line-height:1.5;
   }
   .toggle-btn{
-    background:#eef2ee;
-    color:var(--line);
-    border:1px solid var(--line-soft);
-    font-size:12px;
-    font-family:var(--mono);
+    background: var(--panel-alt);
+    color: var(--accent);
+    border:1px solid #234258;
+    font-size:11px;
     flex:1;
   }
   .toggle-btn.active{
-    background:var(--line);
-    color:#fff;
-    border-color:var(--line);
+    background: var(--accent);
+    color:#04202b;
+    border-color: var(--accent);
   }
   #resetStartBtn{
     background:transparent;
-    color:#8a7f68;
+    color: var(--text-muted);
     border:1px solid var(--border);
-    font-size:12px;
-    font-family:var(--mono);
+    font-size:11px;
     flex:1;
   }
 </style>
@@ -252,28 +333,43 @@
 <body>
 
 <header>
-  <h1>Line Distance Marker</h1>
-  <span class="sub">drop a route, dial in a distance, drop a pin</span>
+  <div class="brand">
+    <span class="dot"></span>
+    <h1>Line Distance Marker</h1>
+    <span class="sub">/ KMZ · KML viewer</span>
+  </div>
+  <div class="stats">
+    <span class="stat">LINES <b id="statLines">0</b></span>
+    <span class="stat">MARKERS <b id="statMarkers">0</b></span>
+    <span class="stat">POINTS <b id="statPoints">0</b></span>
+    <span class="stat">LENGTH <b id="statLength">—</b></span>
+  </div>
 </header>
 
 <div id="app">
   <div id="sidebar">
+   <div id="sidebarScroll">
 
     <div class="field">
       <label for="basemapSelect">Basemap</label>
       <select id="basemapSelect">
+        <option value="dark">Dark</option>
         <option value="streets">Streets</option>
         <option value="satellite">Satellite</option>
         <option value="topo">Topographic</option>
         <option value="light">Light (minimal)</option>
-        <option value="dark">Dark</option>
       </select>
     </div>
 
     <div class="drop" id="dropZone">
-      <strong>Drop KMZ / KML here</strong>
-      or click to choose a file
+      <span class="drop-icon">&#8593;</span>
+      <strong>Drop a KMZ or KML file</strong>
+      or click to browse
       <input type="file" id="fileInput" accept=".kmz,.kml" />
+    </div>
+
+    <div class="info-box">
+      Everything runs locally in this page — your file, line, and markers are never uploaded anywhere. Nothing persists between visits, so download your KMZ before closing the tab.
     </div>
 
     <div class="field" id="toleranceWrap" style="display:none;">
@@ -333,16 +429,20 @@
     </div>
 
     <button id="placeBtn" style="display:none;" disabled>Place marker</button>
-    <button id="downloadBtn" style="display:none; background:#1c4f8a; color:#fff;">Download as KMZ</button>
-    <button id="clearBtn" style="display:none;">Clear all markers</button>
+    <button id="downloadBtn" style="display:none;">Download as KMZ</button>
 
     <hr class="divider" id="divider2" style="display:none;">
 
     <div id="markerListWrap" style="display:none;">
-      <label style="font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:#8a7f68; display:block; margin-bottom:8px;">Placed markers</label>
+      <div class="section-label">Placed markers</div>
       <div id="markerList"></div>
     </div>
 
+   </div>
+   <div id="sidebarFooter">
+     <button id="fitDataBtn">Fit to data</button>
+     <button id="clearBtn">Clear markers</button>
+   </div>
   </div>
   <div id="map"></div>
 </div>
@@ -373,7 +473,7 @@ const baseLayers = {
   })
 };
 
-let currentBase = baseLayers.streets.addTo(map);
+let currentBase = baseLayers.dark.addTo(map);
 
 const basemapSelect = document.getElementById('basemapSelect');
 basemapSelect.addEventListener('change', () => {
@@ -440,6 +540,25 @@ const markerListWrap = document.getElementById('markerListWrap');
 const markerList = document.getElementById('markerList');
 const divider1 = document.getElementById('divider1');
 const divider2 = document.getElementById('divider2');
+const sidebarFooter = document.getElementById('sidebarFooter');
+const fitDataBtn = document.getElementById('fitDataBtn');
+const statLines = document.getElementById('statLines');
+const statMarkers = document.getElementById('statMarkers');
+const statPoints = document.getElementById('statPoints');
+const statLength = document.getElementById('statLength');
+
+function updateHeaderStats(){
+  statLines.textContent = tracks.length;
+  statMarkers.textContent = placedMarkers.length;
+  if (activeTrack) {
+    const totalPoints = activeTrack.segments.reduce((sum,s) => sum + s.length, 0);
+    statPoints.textContent = totalPoints;
+    statLength.textContent = formatDist(activeTrack.lengthKm);
+  } else {
+    statPoints.textContent = '0';
+    statLength.textContent = '—';
+  }
+}
 
 unitSelect.addEventListener('change', () => {
   currentUnit = unitSelect.value;
@@ -448,6 +567,7 @@ unitSelect.addEventListener('change', () => {
   updateStartStatus();
   refreshLineSelectLabels();
   rebuildMarkerListUI();
+  updateHeaderStats();
 });
 
 function refreshStatsDisplay(){
@@ -694,15 +814,16 @@ function buildTracksFromFound(toleranceM){
   labelRow.style.display = 'block';
   placeBtn.style.display = 'block';
   placeBtn.disabled = false;
-  clearBtn.style.display = 'block';
   downloadBtn.style.display = 'block';
   markerListWrap.style.display = 'block';
+  sidebarFooter.style.display = 'flex';
 
   const pieceWord = found.length === 1 ? 'line' : 'line pieces';
   const networkNote = networkDetected
     ? ` Merged into ${tracks.length} continuous run${tracks.length>1?'s':''} (tolerance: ${toleranceM} m).`
     : '';
   setStatus(`Loaded ${found.length} ${pieceWord}.${networkNote}`, 'ok');
+  updateHeaderStats();
 }
 
 rebuildBtn.addEventListener('click', () => {
@@ -737,15 +858,15 @@ function drawActiveTrack(){
   // Draw each segment as its own polyline — Leaflet's multi-polyline form never
   // connects separate arrays with a line, so gaps between segments stay gaps.
   const segLatLngs = activeTrack.segments.map(seg => seg.map(c => [c[1], c[0]]));
-  const poly = L.polyline(segLatLngs, {color:'#2b6a4f', weight:3, opacity:0.9});
+  const poly = L.polyline(segLatLngs, {color:'#4ade80', weight:3, opacity:0.9});
   poly.addTo(lineLayerGroup);
 
   const firstSeg = segLatLngs[0];
   const lastSeg = segLatLngs[segLatLngs.length - 1];
-  L.circleMarker(firstSeg[0], {radius:5, color:'#2b6a4f', fillColor:'#2b6a4f', fillOpacity:1})
+  L.circleMarker(firstSeg[0], {radius:5, color:'#4ade80', fillColor:'#4ade80', fillOpacity:1})
     .bindTooltip('Start (0)', {permanent:false})
     .addTo(lineLayerGroup);
-  L.circleMarker(lastSeg[lastSeg.length-1], {radius:5, color:'#b5561f', fillColor:'#b5561f', fillOpacity:1})
+  L.circleMarker(lastSeg[lastSeg.length-1], {radius:5, color:'#f59e0b', fillColor:'#f59e0b', fillOpacity:1})
     .bindTooltip(`End (${formatDist(activeTrack.lengthKm)})`, {permanent:false})
     .addTo(lineLayerGroup);
 
@@ -754,9 +875,9 @@ function drawActiveTrack(){
     for (let i = 0; i < segLatLngs.length - 1; i++) {
       const endOfSeg = segLatLngs[i][segLatLngs[i].length - 1];
       const startOfNext = segLatLngs[i+1][0];
-      L.circleMarker(endOfSeg, {radius:4, color:'#8a7f68', fillColor:'#fff', fillOpacity:1, weight:2})
+      L.circleMarker(endOfSeg, {radius:4, color:'#5b6b8a', fillColor:'#0d1420', fillOpacity:1, weight:2})
         .bindTooltip(`Segment ${i+1} end`, {permanent:false}).addTo(lineLayerGroup);
-      L.circleMarker(startOfNext, {radius:4, color:'#8a7f68', fillColor:'#fff', fillOpacity:1, weight:2})
+      L.circleMarker(startOfNext, {radius:4, color:'#5b6b8a', fillColor:'#0d1420', fillOpacity:1, weight:2})
         .bindTooltip(`Segment ${i+2} start`, {permanent:false}).addTo(lineLayerGroup);
     }
   }
@@ -769,7 +890,15 @@ function drawActiveTrack(){
 
   startPointWrap.style.display = 'block';
   directionWrap.style.display = 'flex';
+  updateHeaderStats();
 }
+
+fitDataBtn.addEventListener('click', () => {
+  if (!activeTrack) return;
+  const layersToFit = [lineLayerGroup];
+  if (markerLayerGroup.getLayers().length > 0) layersToFit.push(markerLayerGroup);
+  map.fitBounds(L.featureGroup(layersToFit).getBounds(), {padding:[30,30]});
+});
 
 function updateStartStatus(){
   if (!activeTrack) return;
@@ -838,7 +967,7 @@ map.on('click', (e) => {
     const [lon, lat] = snapped.geometry.coordinates;
     startOffsetKm = loc;
     startMarkerLayer.clearLayers();
-    L.circleMarker([lat, lon], {radius:7, color:'#6b4fa0', fillColor:'#6b4fa0', fillOpacity:1, weight:2})
+    L.circleMarker([lat, lon], {radius:7, color:'#a78bfa', fillColor:'#a78bfa', fillOpacity:1, weight:2})
       .bindTooltip(`Custom start — ${formatDist(loc)} along line`, {permanent:false})
       .addTo(startMarkerLayer);
     updateStartStatus();
@@ -852,6 +981,18 @@ map.on('click', (e) => {
 // Shared by both the typed-distance button and click-to-place: targetAbsoluteKm is the
 // distance along the *whole* line from its true start (0), regardless of any custom
 // start point or direction currently configured.
+function makeArrowIcon(){
+  return L.divIcon({
+    className: 'arrow-marker-icon',
+    html: `<svg width="22" height="34" viewBox="0 0 22 34" style="overflow:visible; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));">
+      <line x1="11" y1="0" x2="11" y2="18" stroke="#38bdf8" stroke-width="3" stroke-linecap="round"/>
+      <path d="M11 32 L2 16 L20 16 Z" fill="#38bdf8" stroke="#04202b" stroke-width="1"/>
+    </svg>`,
+    iconSize: [22, 34],
+    iconAnchor: [11, 32] // tip of the arrow lands exactly on the line point
+  });
+}
+
 function placeMarkerAt(targetAbsoluteKm, label){
   if (!activeTrack) return;
   const target = Math.max(0, Math.min(targetAbsoluteKm, activeTrack.lengthKm));
@@ -867,7 +1008,7 @@ function placeMarkerAt(targetAbsoluteKm, label){
   const kmFromStart = (target - startOffsetKm) * direction;
 
   markerCount++;
-  const marker = L.marker([lat, lon]);
+  const marker = L.marker([lat, lon], {icon: makeArrowIcon()});
   marker.addTo(markerLayerGroup);
   marker.openPopup();
   map.panTo([lat, lon]);
@@ -928,6 +1069,7 @@ distInput.addEventListener('keydown', e => {
 });
 
 function rebuildMarkerListUI(){
+  updateHeaderStats();
   markerList.innerHTML = '';
   if (placedMarkers.length === 0) {
     const note = document.createElement('div');
